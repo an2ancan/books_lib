@@ -2,7 +2,7 @@
   <div>
     <AppHeader />
     <div>
-      <router-view/>
+      <router-view @success="success" @error="error" @warning="warning" />
     </div>
     <AppFooter />
   </div>
@@ -12,6 +12,7 @@
 import AppHeader from './components/AppHeader.vue'
 import AppFooter from './components/AppFooter.vue'
 import { store } from './components/store.js'
+import notie from 'notie'
 
 const getCookie = (name) => {
   return document.cookie.split(';').reduce((r, v) => {
@@ -45,38 +46,32 @@ export default {
         last_name: cookieData.user.last_name,
         email: cookieData.user.email,
       }
-      console.log("updateed store with token", store.token)
-    } else {
-      console.log("No cookie found")
     }
-    
+
   },
 
-  // mounted() {
-  //   const payload = {
-  //     foo : "bar",
-  //   }
+  methods: {
+    success(msg) {
+      notie.alert({
+        type: 'success',
+        text: msg,
+      })
+    },
+    error(msg) {
+      notie.alert({
+        type: 'error',
+        text: msg,
+      })
+    },
+    warning(msg) {
+      notie.alert({
+        type: 'warning',
+        text: msg,
+      })
+    }
+  }
 
-  //   // const headers = new Headers({
-  //   //   'Content-Type': 'application/json',
-  //   //   'Authorization': `Bearer ${store.token}`
-  //   // })
-
-  //   const requestOptions = {
-  //     method: 'POST',
-  //     // headers: headers,
-  //     body: JSON.stringify(payload)
-  //   }
-
-  //   fetch("http://localhost:8081/admin/foo", requestOptions)
-  //     .then(response => response.json())
-  //     .then(response => {
-  //       console.log(response)
-  //     })
-  // }
 }
 </script>
 
-<style>
-
-</style>
+<style></style>

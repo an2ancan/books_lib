@@ -2,9 +2,13 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 	"vue-api/internal/data"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type jsonResponse struct {
@@ -48,6 +52,12 @@ func (app *application) Login(w http.ResponseWriter, r *http.Request) {
 	validPassord, err := user.PasswordMatches(creds.Password)
 	if err != nil || !validPassord {
 		app.errorJson(w, errors.New("invalid email or password"), http.StatusForbidden)
+		return
+	}
+
+	// check if user is active
+	if user.Active == 0 {
+		app.errorJson(w, errors.New("user is not active"), http.StatusForbidden)
 		return
 	}
 
@@ -126,4 +136,130 @@ func (app *application) AllUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.writeJSON(w, http.StatusOK, payload)
+}
+
+func (app *application) EditUser(w http.ResponseWriter, r *http.Request) {
+	var user data.User
+	err := app.readJSON(w, r, &user)
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	if user.ID == 0 {
+		// add user
+		if _, err := app.models.User.Insert(user); err != nil {
+			app.errorJson(w, err)
+			return
+		}
+
+	} else {
+		// update user
+		u, err := app.models.User.GetOne(user.ID)
+		if err != nil {
+			app.errorJson(w, err)
+			return
+		}
+
+		u.Email = user.Email
+		u.FirstName = user.FirstName
+		u.LastName = user.LastName
+		u.Active = user.Active
+
+		if err := u.Update(); err != nil {
+			app.errorJson(w, err)
+			return
+		}
+
+		if user.Password != "" {
+			err := u.ResetPassword(user.Password)
+			if err != nil {
+				app.errorJson(w, err)
+				return
+			}
+		}
+
+	}
+	payload := jsonResponse{
+		Error:   false,
+		Message: "Editing Done",
+	}
+
+	_ = app.writeJSON(w, http.StatusOK, payload)
+
+}
+
+func (app *application) GetUser(w http.ResponseWriter, r *http.Request) {
+	userId, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	user, err := app.models.User.GetOne(userId)
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	_ = app.writeJSON(w, http.StatusOK, user)
+}
+
+func (app *application) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	var requestPayload struct {
+		ID int `json:"id"`
+	}
+
+	err := app.readJSON(w, r, &requestPayload)
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	err = app.models.User.DeleteById(requestPayload.ID)
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("user %d deleted", requestPayload.ID),
+	}
+
+	_ = app.writeJSON(w, http.StatusOK, payload)
+}
+
+func (app *application) LogUserOutAndSetInactive(w http.ResponseWriter, r *http.Request) {
+	userId, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+	user, err := app.models.User.GetOne(userId)
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	user.Active = 0
+	err = user.Update()
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	// delete token
+	err = app.models.Token.DeleteTokenForUser(userId)
+	if err != nil {
+		app.errorJson(w, err)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("user %d logged out and set inactive", userId),
+	}
+
+	_ = app.writeJSON(w, http.StatusAccepted, payload)
 }

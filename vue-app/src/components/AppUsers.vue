@@ -6,11 +6,13 @@
             </div>
             <hr>
             
-            <table class="table table-compact table-striped">
+            <table v-if="this.ready" class="table table-compact table-striped">
                 <thead>
                     <tr>
                         <th>User</th>
                         <th>Email</th>
+                        <th>Active</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -23,9 +25,25 @@
                         <td>
                             {{ u.email }}
                         </td>
+
+                        <td v-if="u.active === 1" >
+                            <span class="badge bg-success">Active</span>
+                        </td>
+                        <td v-else>
+                            <span class="badge bg-danger">Inactive</span>
+                        </td>
+
+                        <td v-if="u.token.id > 0">
+                            <span class="badge bg-success" @click="logUserOut(u.id)">Logged in</span>
+                        </td>
+                        <td v-else>
+                            <span class="badge bg-danger">Not logged in</span>
+                        </td>
+                        
                     </tr>
                 </tbody>
             </table>
+            <p v-else>Loading...</p>
             
         </div>
     </div>
@@ -34,10 +52,14 @@
 <script>
 import Security from './security';
 import notie from 'notie';
+import { store } from './store'
+
 export default ({
     data() {
         return {
-            users: []
+            users: [],
+            ready: false,
+            store,
         }
     },
     beforeMount() {
@@ -55,6 +77,7 @@ export default ({
                     )
                 } else {
                     this.users = response.data.users;
+                    this.ready = true;
                 }
             })
             .catch(error => {
@@ -65,6 +88,21 @@ export default ({
                     }
                 )
             })
+    },
+    methods: {
+        logUserOut(id){
+            if (id !== store.user.id){
+                notie.confirm({
+                    text: "Are you sure you want to log this user out?",
+                    submitText: "log Out",
+                    subbmitCallback: ()=>{
+                        console.log("Logging out user " + id);
+                    }
+                })
+            } else {
+                this.$emit('error', 'you cant log yourself out');
+            }
+        }
     }
 })
 </script>
